@@ -1,147 +1,126 @@
-# SolQuant Inference Server
-
-A production-grade REST API for serving extremely quantized Small Language Models (SLMs) on constrained NVIDIA GPUs. Designed and tested for the **NVIDIA MX550 (2 GB GDDR6 VRAM)**.
-
+ SolQuant
+SolQuant is a three-tier AI edge stack for low-VRAM systems, combining:
+- a **Python FastAPI inference engine** (llama-cpp + GGUF),
+- a **MongoDB Atlas Local vector store** for RAG,
+- and a **Java Spring Boot agent orchestrator** (LangChain4j).
+The project is tuned for constrained NVIDIA hardware (tested on MX550-class GPUs) and is designed for system monitoring and alert-driven agent workflows.
 ## Architecture
-
+```text
+┌──────────────────────────────────────────────────────────────┐
+│ Orchestrator (Spring Boot, Java 21)                         │
+│ - POST /api/agent/chat                                      │
+│ - GET  /api/agent/health                                    │
+│ Uses LangChain4j + tools for metrics and alerting           │
+└───────────────┬──────────────────────────────────────────────┘
+                │ HTTP
+                ▼
+┌──────────────────────────────────────────────────────────────┐
+│ Inference Engine (FastAPI, Python)                          │
+│ - POST /generate                                             │
+│ - GET  /health                                               │
+│ - GET  /vram                                                 │
+│ Loads quantized GGUF model via llama-cpp-python             │
+└───────────────┬──────────────────────────────────────────────┘
+                │
+                ▼
+┌──────────────────────────────────────────────────────────────┐
+│ Vector DB (MongoDB Atlas Local)                             │
+│ Stores embeddings and supports vector search for RAG         │
+└──────────────────────────────────────────────────────────────┘
 ```
-┌─────────────────────────────────────────────────┐
-│  FastAPI Server (server.py)                     │
-│  ├── POST /generate  ← text generation + VRAM  │
-│  ├── GET  /health    ← model & GPU status       │
-│  └── GET  /vram      ← real-time VRAM monitor   │
-├─────────────────────────────────────────────────┤
-│  Model Loader (model_loader.py)                 │
-│  └── HuggingFace download → llama-cpp-python    │
-├─────────────────────────────────────────────────┤
-│  VRAM Monitor (vram_monitor.py)                 │
-│  └── pynvml snapshots + inference tracking      │
-├─────────────────────────────────────────────────┤
-│  Config (config.py)                             │
-│  └── pydantic-settings + env vars (SQ_ prefix)  │
-└─────────────────────────────────────────────────┘
+## Repository Structure
+```text
+.
+├── agent-controller/       # Spring Boot orchestrator
+├── rag/                    # RAG ingestion, embeddings, retrieval, DB helpers
+├── server.py               # FastAPI app and endpoints
+├── model_loader.py         # Model download/load lifecycle
+├── vram_monitor.py         # NVML-based VRAM monitoring
+├── schemas.py              # API schemas
+├── config.py               # Inference config (SQ_*)
+├── docker-compose.yml      # Full stack orchestration
+├── deploy.sh               # Guided deployment script
+└── .env.example            # Environment template
 ```
-
-## VRAM Budget (MX550 — 2048 MB)
-
-| Component | Estimated Usage |
-|---|---|
-| CUDA driver + context | ~200 MB |
-| Qwen2.5-0.5B Q4_K_M weights (24 layers) | ~400 MB |
-| KV cache (ctx=2048) | ~120 MB |
-| Inference scratch buffers | ~80 MB |
-| **Total** | **~800 MB** |
-| **Headroom remaining** | **~1248 MB** |
-
-## Quick Start
-
-### 1. Prerequisites
-
-- Python 3.11+
-- NVIDIA GPU with CUDA toolkit installed
+## Core Components
+### 1) Inference Engine (Python)
+- FastAPI API for text generation and VRAM observability.
+- Automatic GGUF model download from Hugging Face.
+- Concurrency protection to avoid multi-request GPU OOM.
+- Tuned defaults for low-VRAM operation.
+Endpoints:
+- `POST /generate`
+- `GET /health`
+- `GET /vram`
+### 2) Agent Controller (Java / LangChain4j)
+- Exposes an AI monitoring agent over HTTP.
+- Bridges to the Python inference engine through a custom chat model.
+- Includes tool-enabled workflows:
+  - `readSystemMetrics` (CPU/RAM/disk/temp report)
+  - `writeAlert` (INFO/WARNING/CRITICAL alert logging)
+Endpoints:
+- `POST /api/agent/chat`
+- `GET /api/agent/health`
+### 3) RAG Pipeline (Python)
+- Log ingestion and chunking.
+- Embedding generation (all-MiniLM-L6-v2).
+- MongoDB vector index creation and retrieval utilities.
+## Quick Start (Recommended: Docker)
+### Prerequisites
+- Docker Engine + Docker Compose v2
+- NVIDIA drivers installed
+- NVIDIA Container Toolkit configured
 - `nvidia-smi` working
-
-### 2. Install
-
+### Deploy
 ```bash
-# Create virtual environment
+chmod +x deploy.sh
+./deploy.sh
+```
+Useful commands:
+```bash
+./deploy.sh --status   # service status + endpoints
+./deploy.sh --logs     # stream logs
+./deploy.sh --build    # rebuild images without cache
+./deploy.sh --down     # stop stack
+```
+## Local Run (Inference Engine Only)
+```bash
 python -m venv .venv
 source .venv/bin/activate
-
-# Install dependencies (CUDA-enabled llama-cpp-python)
 CMAKE_ARGS="-DGGML_CUDA=on" pip install -r requirements.txt
-```
-
-### 3. Configure
-
-```bash
 cp .env.example .env
-# Edit .env if needed (defaults are tuned for MX550)
-```
-
-### 4. Run
-
-```bash
 python main.py
-# or
-uvicorn server:app --host 0.0.0.0 --port 8000
 ```
-
-The model will be auto-downloaded from HuggingFace on first run (~350 MB).
-
-### 5. Test
-
+## API Examples
+### Inference Health
 ```bash
-# Health check
-curl http://localhost:8000/health | python -m json.tool
-
-# Generate text
+curl http://localhost:8000/health
+```
+### Text Generation
+```bash
 curl -X POST http://localhost:8000/generate \
   -H "Content-Type: application/json" \
   -d '{
-    "prompt": "Explain quantum computing in one paragraph.",
+    "prompt": "Summarize current edge system status.",
     "max_tokens": 256,
-    "temperature": 0.7
-  }' | python -m json.tool
-
-# VRAM status
-curl http://localhost:8000/vram | python -m json.tool
+    "temperature": 0.3
+  }'
 ```
-
-## API Reference
-
-### `POST /generate`
-
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `prompt` | string | *required* | Input text |
-| `max_tokens` | int | 512 | Max tokens to generate |
-| `temperature` | float | 0.7 | Sampling temperature |
-| `top_p` | float | 0.9 | Nucleus sampling threshold |
-| `top_k` | int | 40 | Top-K sampling |
-| `repeat_penalty` | float | 1.1 | Repetition penalty |
-| `system_prompt` | string | "You are a helpful assistant." | System instruction |
-
-**Response** includes `text`, `tokens_generated`, `tokens_per_second`, and a `vram` object with before/after/peak memory usage.
-
-### `GET /health`
-
-Returns model status, GPU layer count, context size, and current VRAM snapshot.
-
-### `GET /vram`
-
-Returns current VRAM utilization and whether usage is within the configured budget.
-
-## Tuning for OOM Safety
-
-If you encounter OOM errors, adjust these in `.env`:
-
+### Agent Chat
 ```bash
-# Reduce GPU layers (moves layers to CPU — slower but less VRAM)
-SQ_N_GPU_LAYERS=18
-
-# Reduce context window (shrinks KV cache)
-SQ_N_CTX=1024
-
-# Reduce batch size
-SQ_N_BATCH=256
+curl -X POST http://localhost:8081/api/agent/chat \
+  -H "Content-Type: application/json" \
+  -d '{"query":"How healthy is the system right now?"}'
 ```
-
-## Project Structure
-
-```
-SolQuant/
-├── main.py            # Entry point (uvicorn launcher)
-├── server.py          # FastAPI app + endpoints
-├── model_loader.py    # Model download + llama-cpp loading
-├── vram_monitor.py    # NVIDIA VRAM profiling
-├── config.py          # Settings (env vars / .env)
-├── schemas.py         # Pydantic request/response models
-├── requirements.txt   # Python dependencies
-├── .env.example       # Environment template
-└── models/            # Downloaded GGUF files (gitignored)
-```
-
+## Configuration
+Copy `.env.example` to `.env` and adjust values as needed.
+Key groups:
+- `SQ_*` — inference model/runtime settings
+- `RAG_*` — MongoDB + embedding + retrieval settings
+- `SOLQUANT_*` — orchestrator-to-inference integration settings (Docker/env)
+## Development Notes
+- Java module targets **Java 21** (`agent-controller/pom.xml`).
+- Maven tests/build for `agent-controller` require a Java 21 toolchain.
+- Inference defaults are optimized for low-VRAM cards; reduce `SQ_N_GPU_LAYERS`, `SQ_N_CTX`, or `SQ_N_BATCH` if you encounter OOM.
 ## License
-
-Internal use — SolQuant Project.
+Internal use — SolQuant project.
