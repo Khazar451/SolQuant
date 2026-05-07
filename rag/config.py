@@ -38,7 +38,7 @@ class RAGSettings(BaseSettings):
     retrieval_top_k: int = 3                 # number of results to return
     retrieval_score_threshold: float = 0.0   # minimum similarity score
 
-    model_config = {"env_prefix": "RAG_", "env_file": ".env"}
+    model_config = {"env_prefix": "RAG_", "env_file": ".env", "extra": "ignore"}
 
 
 rag_settings = RAGSettings()

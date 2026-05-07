@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     port: int = 8000
     log_level: str = "info"
 
-    model_config = {"env_prefix": "SQ_", "env_file": ".env"}
+    model_config = {"env_prefix": "SQ_", "env_file": ".env", "extra": "ignore"}
 
 
 settings = Settings()
