@@ -1,0 +1,19 @@
+# Exclude from Docker build context
+.env
+.env.example
+.git/
+.gitignore
+__pycache__/
+*.pyc
+*.pyo
+models/
+*.gguf
+agent-controller/
+docker-compose.yml
+deploy.sh
+*.Dockerfile
+*.dockerignore
+*.md
+logs/
+.venv/
+venv/

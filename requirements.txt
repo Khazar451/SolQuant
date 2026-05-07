@@ -1,0 +1,35 @@
+# SolQuant Inference Server - Dependencies
+# ==========================================
+# Core API framework
+fastapi==0.115.12
+uvicorn[standard]==0.34.2
+
+# LLM inference engine (CUDA build)
+# Install with: CMAKE_ARGS="-DGGML_CUDA=on" pip install llama-cpp-python
+llama-cpp-python==0.3.9
+
+# NVIDIA GPU monitoring
+pynvml==12.0.0
+
+# Request validation & settings
+pydantic==2.11.3
+pydantic-settings==2.9.1
+
+# Async HTTP (for health checks)
+httpx==0.28.1
+
+# Logging
+structlog==25.4.0
+
+# Model downloading
+huggingface-hub==0.31.1
+
+# ── RAG Pipeline ────────────────────────────────
+# MongoDB driver
+pymongo[srv]==4.12.1
+
+# Embedding model (all-MiniLM-L6-v2)
+sentence-transformers==4.1.0
+
+# Text chunking
+langchain-text-splitters==0.3.8

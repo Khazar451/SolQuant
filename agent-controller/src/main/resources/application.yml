@@ -1,0 +1,34 @@
+# ═══════════════════════════════════════════════════════════════════
+# SolQuant Agent Controller — Configuration
+# ═══════════════════════════════════════════════════════════════════
+
+server:
+  port: 8081  # Avoids conflict with FastAPI on 8000
+
+spring:
+  application:
+    name: solquant-agent-controller
+
+# ── Custom LLM Backend (FastAPI inference server) ─────────────────
+solquant:
+  llm:
+    base-url: http://localhost:8000
+    generate-path: /generate
+    max-tokens: 512
+    temperature: 0.3          # Low temp for tool-use reliability
+    timeout-seconds: 120      # SLMs on MX550 can be slow
+    system-prompt: |
+      You are an edge system monitoring AI agent. You have access to tools
+      that can read system metrics (CPU, RAM, disk) and write alerts to a
+      log file. When asked about system health, ALWAYS use the available
+      tools to gather real data before responding. Analyse the metrics and
+      raise alerts for any anomalies.
+
+  # ── Alert logging ─────────────────────────────────────────────────
+  alerts:
+    log-file: ./logs/alerts.log
+
+logging:
+  level:
+    com.solquant: DEBUG
+    dev.langchain4j: DEBUG

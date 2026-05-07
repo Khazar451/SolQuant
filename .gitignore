@@ -1,0 +1,31 @@
+# Models (large binary files)
+models/
+*.gguf
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Java / Maven
+agent-controller/target/
+*.jar
+*.class
+
+# Environment
+.env
+
+# Docker
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+

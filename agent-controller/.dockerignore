@@ -1,0 +1,9 @@
+# Exclude from Docker build context
+target/
+.idea/
+*.iml
+.settings/
+.classpath
+.project
+logs/
+*.md
