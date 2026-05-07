@@ -1,4 +1,4 @@
- SolQuant
+# SolQuant
 SolQuant is a three-tier AI edge stack for low-VRAM systems, combining:
 - a **Python FastAPI inference engine** (llama-cpp + GGUF),
 - a **MongoDB Atlas Local vector store** for RAG,
