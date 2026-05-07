@@ -1,6 +1,6 @@
 # SolQuant Inference Server
 
-A production-grade REST API for serving extremely quantized Small Language Models (SLMs) on constrained NVIDIA GPUs. Designed and tested for the **NVIDIA MX550 (2 GB GDDR6 VRAM)**.
+A production-grade REST API for serving extremely quantized Small Language Models (SLMs) on constrained NVIDIA GPUs. Designed for low VRAM GPUs (2-4 GB) and tested on the **NVIDIA MX550 (2 GB GDDR6 VRAM)**.
 
 ## Architecture
 
